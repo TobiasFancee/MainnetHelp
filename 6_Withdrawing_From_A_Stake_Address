@@ -1,0 +1,42 @@
+#This is not a script. This is just an example of the cardano-cli commands used to withdraw from a stake address.
+#replace payment.addr, stake.addr, payment.skey, and stake.skey with your file names
+
+#Use either command below to get the amount of ADA in the stake address (stake.addr in this example)
+
+cardano-cli shelley query stake-address-info --address $(cat stake.addr) --mainnet
+
+or
+
+cardano-cli shelley query stake-address-info --address $(cat stake.addr) --mainnet  | jq '.[].rewardAccountBalance'
+
+#query the payment address that will be used to pay for the transaction fee
+
+cardano-cli shelley query utxo --address $(cat payment.addr) --mainnet
+
+#query the tip to find ttl (ttl = tip + 1000)
+
+cardano-cli shelley query tip --mainnet
+
+#create a dummy transaction to for fee calculation (replace the utxo and TxIx with what you got when you queried the payment address)(replace '100' with the amount of rewards you got when you queried the stake.addr)
+
+cardano-cli shelley transaction build-raw --tx-in 0520e1...#0 --tx-out $(cat payment.addr)+0 --ttl 0 --fee 0 --withdrawal $(cat stake.addr)+100 --tx-body-file tx.raw
+
+#calculate the fee
+
+cardano-cli shelley transaction calculate-min-fee --tx-in-count 1 --tx-out-count 1 --mainnet --tx-body-file tx.raw --witness-count 2 --byron-witness-count 0 --protocol-params-file protocol.json
+
+#find the amount of ADA you will send to yourself (payment.addr)
+
+expr (amount in utxo) + rewards - fees
+
+#build the final transaction (replace the utxo, TxIx, the amount being sent to payment.addr, ttl, fee, and  the amount of rewards in stake.addr with your info)
+
+cardano-cli shelley transaction build-raw --tx-in 0520e1#0 --tx-out $(cat payment.addr)+500 --ttl 800000 --fee 180000 --withdrawal $(cat stake.addr)+100 --tx-body-file tx.raw
+
+#sign the transaction
+
+cardano-cli shelley transaction sign --tx-body-file tx.raw --mainnet --signing-key-file payment.skey --signing-key-file stake.skey --out-file tx.signed
+
+#submit the transaction
+
+cardano-cli shelley transaction submit --mainnet --tx-file tx.signed
